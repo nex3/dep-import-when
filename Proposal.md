@@ -70,11 +70,12 @@ cross-platform code, but it is nice to have:
 
 ## Examples
 
-To begin, let's look at an example from [the External Library proposal][external
-libs]. We want to write a library that exposes a `warn()` function that warns
-using the DOM on the browser and `stderr` on the standalone VM.
+To begin, let's look at an example from
+[the External Library proposal][external libs]. We want to write a library that
+exposes a `warn()` function that warns using the DOM on the browser and `stderr`
+on the standalone VM.
 
-[external libs]: /munificent/dep-external-libraries/blob/master/Proposal.md
+[external libs]: https://github.com/munificent/dep-external-libraries/blob/master/Proposal.md
 
 Using Import When, you would write:
 
@@ -200,7 +201,7 @@ roughly the same as in [the configured imports proposal][env constants]. If this
 returns `true`, the import proceeds as normal. Otherwise, an *interface view* of
 the library is imported instead (see below for a definition).
 
-[env constants]: /lrhn/dep-configured-imports/blob/master/DEP-configured-imports.md#plaform-libraries
+[env constants]: https://github.com/lrhn/dep-configured-imports/blob/master/DEP-configured-imports.md#plaform-libraries
 
 A platform-restricted library may be imported as an interface view without
 error, even on platforms that currently don't support that library at all. An
@@ -361,7 +362,7 @@ of the original 1.2M. Most libraries' interface views should be even smaller
 relative to their size, since `dart:html` is uniquely full of annotations.
 `dart:io`, for example, goes from 780K to 50K.
 
-[stubbed]: /nex3/dep-import-when/blob/master/interface_view_example/dart_html.dart
+[stubbed]: https://github.com/nex3/dep-import-when/blob/master/interface_view_example/dart_html.dart
 [stub]: https://github.com/dart-lang/bleeding_edge/tree/master/dart/pkg/stub_core_library
 
 ## Deliverables
