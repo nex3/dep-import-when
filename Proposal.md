@@ -1,110 +1,369 @@
-# Proposal name
+# Import When
 
-The name of your proposal. Make it brief but unambiguous. We will be referring to it in hallway conversations, email, comment threads, and likely in our dreams, so make it snappy but try to spare the buzzwords and marketing.
+**Note: this is a work-in-progress proposal. It's still gathering community
+feedback and has not yet been submitted as an official DEP.**
 
-## Contact information
-
-Three key pieces of information are required:
-
-1. **Your name.** As the author, you are signing up to shepherd this proposal through the process. (A proposal *can* be passed on to someone else if really needed, but at any point in time, it must have a living breathing owner who actively cares about it.)
-
-2. **Your contact information.** Email address at a bare minimum. A GitHub account is good too.
-
-3. **The repository where this proposal and its associated artifacts lives.** At first, this document will live *in* that repo, so it's kind of implicit. But, when the proposal is approved, the text will be migrated into the canonical repository for completed DEPs. At that point, we want it to point out to the original repo so readers can find the other artifacts, history, and discussion.
-
-In addition, a list of other stakeholders is good. These are people who have a vested interest and relevant expertise in the proposal. Good stakeholders are ones who:
-
-- Own important Dart applications or frameworks.
-- Are acutely feeling the pain this proposal addresses.
-- Can provide clear, articulate feedback.
-
-Names, email, and GitHub accounts if they have them.
+* Author: [Natalie Weizenbaum](/nex3) (nweiz@google.com)
+* Repository: [google/dep-import-with](/google/dep-import-with)
+* Stakeholders: [Lasse](/lrhn) (lrn@google.com)
 
 ## Summary
 
-A brief description of the proposal. Think a couple of sentences or
-a short paragraph. Maybe a small snippet of code or example.
+Add a `when` modifier to `import` that controls when the implementation of the
+imported library is made available, based on environment constants. `import
+<url> when <constant>` is identical to `import <url>` when the constant is true,
+and imports only the interfaces of the library without the implementation when
+it's false. Platform-restricted libraries such as `dart:io` and `dart:html` may
+be imported on unsupported platforms as long as their `when` expression
+evaluates to false.
+
+```dart
+import "dart:io" when dart.io;
+
+// Throws UnsupportedError when run on a browser.
+void main() => print(Platform.operatingSystem);
+```
 
 ## Motivation
 
-This is in many ways the most important section. It motivates the reader to care about the problems or shortcomings this proposal addresses. The language specification and the language committee are both finite resources. Tell us why we should spend them on this issue instead of others.
+As Dart is used more widely on the browser and the server, and with mobile
+operating systems on the horizon, it becomes more important for the ecosystem to
+support packages that work across platforms. These packages provide consistent
+metaphors for functionality whose API differs from platform to platform. They
+prevent the ecosystem from fragmenting and encourage the proliferation of
+re-usable libraries.
 
-Describe in detail the existing problems or use cases this proposal addresses. A use case is more compelling when:
+Currently, barring hacked-together workarounds, there's no way to write a
+package that encapsulates a unified interface for `dart:io` and `dart:html`
+functionality. The ability to do so is so strongly desired, though, that very
+popular packages using exactly these hacked-together workarounds to support it.
+The `http` package uses `dart:mirrors` to dynamically instantiate the right
+classes; the `path` package used to do so as well, but it was so important that
+the cross-platform API it needed was eventually moved into `dart:core`.
 
-- It affects a large number of users.
-- These users are writing real-world programs.
-- It's difficult or impossible to workaround the problems.
+This proposal, like several others of its kind, is intended to support this sort
+of encapsulation. It has its own particular goals as well:
 
-In other words, the ideal motivation is a problem that's preventing every Dart user from shipping their app.
+* A cross-platform package should be able to be as usable for single-platform
+  development as it would be if it supported only that platform. This means:
+
+  * It should be able to accept and return unwrapped platform-native objects
+    with well-typed APIs.
+
+  * It should be able to implement platform-native interfaces.
+
+  * It shouldn't require additional imports to use the above.
+
+* It should be easy for an application that targets a single platform to exclude
+  code that's written for another platform at compile-time.
+
+* It should be easy for the Dart analyzer to process and expose information
+  about cross-platform libraries. The user shouldn't have to choose a single
+  platform to use for analysis. An important component of this is keeping the
+  static shape of the program the same regardless of the platform.
+
+The following isn't a requirement, since the overarching goal is to support
+cross-platform code, but it is nice to have:
+
+* It should be easy for an application to exclude code at compile-time based on
+  user configuration, independent of any platform considerations.
 
 ## Examples
 
-Now that you've hopefully sold us caring about the problem, show us your solution. We'll get into the general behavior soon, but first, walk us through a few realistic examples of how the proposal would be used in practice.
+To begin, let's look at an example from [the external library proposal][external
+libs]. We want to write a library that exposes a `warn()` function that warns
+using the DOM on the browser and `stderr` on the standalone VM.
 
-Humans tend to absorb information better if you start with examples and then show the general principle, so this is the place for your proposal's highlight reel. It gives us readers a chance to develop and intuition for what your proposal does and get a feel for its user experience.
+[external libs]: /munificent/dep-external-libraries/blob/master/Proposal.md
 
-Try to use real-world examples. Keep them small, but with realistic context. "Foo" and "bar" make it hard to evaluate how the proposal would look in real code.
+Using Import When, you would write:
+
+```dart
+// warn.dart
+import 'dart:html' when dart.html;
+import 'dart:io' when dart.io;
+
+/// Warns the user about [message].
+void warn(String message) {
+  if (const bool.fromEnvironment("dart.html")) {
+    document.body.appendHtml('<div class="warn">$message</div>');
+  } else {
+    stderr.writeLine(message);
+  }
+}
+```
+
+A simple program that uses this library would look like this:
+
+```dart
+// main.dart
+import 'warn.dart';
+
+void main() {
+  warn("This proposal is still in progress!");
+}
+```
+
+The standalone VM sets the environment constant `dart.io` to true and
+`dart.html` to false. This means that `dart:io` is loaded in full, but only the
+interfaces of `dart:html` are loaded. The `warn()` function uses the existing
+`bool.fromEnvironment` API to check the same constants; since `dart.html` is
+false, it decides to use `stderr`. If it had accessed `document` on the
+standalone VM, it would have thrown an `UnsupportedError`. On the browser, the
+behavior is reversed: `dart.io` is false and `dart.html` is true.
+
+This is a simple use-case and the code is similarly simple: a single file with a
+single function and an `if` statement that makes it locally clear what that
+function does on each platform.
+
+### A cross-platform HTTP client
+
+Let's steal from the external library proposal again, since an HTTP client is
+such a good example&mdash;it's simple and widely-used, and there's a
+cross-platform package that implements it right now that we can base our
+implementation on.
+
+The `http` package is structured around the `Client` interface: this is a
+simple, cross-platform interface for making HTTP requests. There are also the
+`IoClient` and `BrowserClient` subclasses, which have extra platform-specific
+bells and whistles. When you write `new Client()`, you should get one of these
+based on your current platform.
+
+Here's what the `Client` interface looks like with Import When:
+
+```dart
+// client.dart
+import "browser_client.dart" when dart.html;
+import "io_client.dart" when dart.io;
+
+abstract class Client {
+  factory Client() {
+    if (const bool.fromEnvironment("dart.html")) return new BrowserClient();
+    return new IoClient();
+  }
+
+  /// Sends an HTTP GET request with the given headers to the given URL, which
+  /// can be a [Uri] or a [String].
+  Future<Response> get(url, {Map<String, String> headers});
+
+  // ...
+}
+```
+
+It's a very normal-looking interface with a factory constructor. The only
+special thing about is the `when` annotation on the imports, which ensures that
+the specific clients' implementations are stripped out on unsupported platforms.
+
+The platform-specific libraries look even more normal:
+
+```dart
+// io_client.dart
+import "dart:io":
+
+import "client.dart";
+
+class IoClient implements Client {
+  /// The underlying HTTP client.
+  final HttpClient _inner;
+
+  /// Creates a new HTTP client.
+  ///
+  /// If [innerClient] isn't passed, a default one will be instantiated.
+  IoClient([HttpClient inner])
+      : _inner = inner == null ? new HttpClient() : inner;
+
+  Future<Response> get(url, Map<String, String> headers) {
+    // Use _inner...
+  }
+}
+```
+
+You might notice that this library doesn't use `when`. It doesn't need to: it's
+a platform-specific library much like `dart:io`. Its users&mdash;in this case,
+`client.dart`&mdash;can import it using `when` if they want to be
+cross-platform. If they're okay with being tied to `dart:io`, they can also just
+import it normally and pass in their own `HttpClient` with special SSL
+certificate handling or whatever.
+
+It's also worth noting that if a web application uses `client.dart`, the
+implementation of `IoClient` is removed completely when the application is
+compiled to JS.
 
 ## Proposal
 
-At this point, we should care about your problem and think your solution looks beautiful. Now it's time to dig in and explain how it works in detail. Cover the syntax and semantics precisely and clearly.
+### Runtime Behavior
 
-Describe its behavior in common usage, but also how it acts in bizarre corner cases. You don't need to be as precise as actual language spec verbiage, but this is the place where you start heading in that direction.
+When an `import` statement with a "when" clause is encountered, that clause's
+identifier is evaluated as an environment constant (that is, as though it were a
+parameter to `bool.fromEnvironment`). The definition of these constants is
+roughly the same as in [the configured imports proposal][env constants]. If this
+returns `true`, the import proceeds as normal. Otherwise, an *interface view* of
+the library is imported instead (see below for a definition).
 
-This is probably the least fun, but ultimately the most important section.
+[env constants]: /lrhn/dep-configured-imports/blob/master/DEP-configured-imports.md#plaform-libraries
+
+A platform-restricted library may be imported as an interface view without
+error, even on platforms that currently don't support that library at all. An
+import of a platform-restricted library with `when` still produces an error if
+the `when` clause evaluates to `true` *and* the library is unsupported on the
+current platform. Other import failures such as those caused by missing files
+happen as normal regardless of `when`.
+
+A `with` clause may be used with any other import clause, including `as`,
+`show`, and `hide`. It may also be used with `export`, in which case the
+interface view (if one is used) is exported rather than imported.
+
+### "Interface View"
+
+An *interface view* of a library is a new library with an identical static API
+but no implementation. In particular:
+
+* All top-level or static function definitions of any kind, any instance
+  methods, and any non-`const` constructors synchronously throw
+  `UnsupportedError`s when called. Any default arguments for these functions are
+  replaced with `null`.
+
+* All non-`const` fields are converted to getters (and setters unless they're
+  final) that throw `UnsupportedError`s when called.
+
+* `const` fields and constructors are maintained as-is, since they're guaranteed
+  to be available across platforms and new behavior can't be added without
+  breaking the existing API.
+
+If it's useful, another possible modification would be:
+
+* A library imported only as an interface view is not visible to `dart:mirrors`.
+
+All of this includes the library itself as well as any libraries it exports. If
+it exports a library that's imported normally elsewhere in the program, those
+two libraries are not considered identical, even if they otherwise would be
+according to the canonicalization rules.
+
+### Analysis
+
+The Dart analyzer should simply ignore the `when` clause on imports; since the
+static shape and code locations of the program are identical regardless of the
+platform or configuration, this will continue to produce the correct results.
+
+The analyzer may choose to add a mode where users can specify that they only
+care about one platform and that extra warnings should be raised if code from
+another is used, but that's outside the scope of this proposal.
 
 ## Alternatives
 
-While you may think of your solution as a perfect snowflake, there are other pretty snowflakes out there. Describe alternate solutions that cover the same space as this proposal. Compare them to the proposal and each other and explain why they were rejected.
+There have been three other major proposals floated for supporting
+cross-platform packages, each with slightly different goals and substantially
+different semantics. In chronological order:
 
-What advantages do these alternatives have that the chosen one lacks? What does the selected proposal offer to outweigh them? Being rigorous here shows that you've done your due diligence and fully explored both the problem and the potential solution space. We want to be confident that we have not just *a* solution to the problem, but the *best* one.
+### "Søren's Proposal"
+
+This proposal by [Søren Gjesse](https://github.com/sgjesse) predates the DEP
+process and doesn't have an official name or a repository. It's also the
+simplest of the four proposals, and the one that's closest to "import with".
+Rather than adding an explicit keyword that can be used to get the interface
+view of any library, though, it just says that platform-restricted libraries are
+*always* imported as interface views.
+
+This is simpler, but not by a lot; `with dart.io` isn't a large burden to type,
+especially since it will usually come up only once or twice per package. On the
+other hand, it has some serious downsides relative to "import with".
+
+Without an explicit marker of whether a library intends to work across
+platforms, it's difficult for a reader or someone who modifies the code in the
+future to know what code is acceptable to write where. If `dart:io` is imported,
+can they freely use global `dart:io` fields, or should they check
+`bool.fromEnvironment` first?
+
+Søren's proposal also relies on tree shaking alone to avoid including code for
+an unused platform in compiled output; it has no means of saying, for example,
+that the implementation of `IoClient` isn't useful on the browser. `dart2js` is
+good at tree shaking, but it can get foiled in various ways whose root causes
+aren't always clear or fixable.
+
+### Configured Imports
+
+The [Configured Imports][] proposal takes a different tack, proposing a syntax
+for choosing between files to import based on environment constants. The imports
+themselves work as normal; it's only the choice that varies from platform to
+platform.
+
+[Configured Imports]: https://github.com/lrhn/dep-configured-imports/blob/master/DEP-configured-imports.md
+
+This proposal very clearly satisfies the goal of only including code that's
+relevant to the current platform, since other platforms' code isn't imported in
+any capacity. However, it makes cross-platform packages less usable than they
+would be on a single platform: it's impossible for the cross-platform portion of
+a package to implement platform-specific interfaces or take and return
+platform-specific objects in a typed fashion. There's no way to reference the
+class `Element` on the VM, for example, even to say "this method can work with
+native Elements or classes that support the same API."
+
+The proposal also produces a lot of complexity for static analysis. The
+specifics [don't seem to be entirely settled][analyzer issue], but one of two
+options seems likely: either a user has to select a single configuration, which
+isn't helpful if they're also trying to write cross-platform code; or the
+analyzer has to perform some sort of overlay of all possible APIs, which would
+be very complex both for the people coding the analyzer and the users trying to
+reason about its behavior.
+
+[analyzer issue]: https://github.com/lrhn/dep-configured-imports/issues/4
+
+### External Libraries
+
+The [External Libraries][external libs] proposal evolved out of the Configured
+Imports proposal. It similarly supports choosing multiple libraries, but it adds
+a mechanism to ensure that they support the same API: a *canonical* library that
+declares multiple implementations as *external*. The canonical library declares
+which APIs it expects the external libraries to fill in, and then the external
+libraries libraries define those APIs in platform-specific ways.
+
+This proposal introduces a lot more language complexity than Configured
+Imports&mdash;on top of a library-choice mechanism, it also adds a notion of
+"external" that involves somewhat complicated scope resolutions. That said, it
+certainly achieves its goal of simple static analysis: the analyzer only has to
+look at the canonical library, and the static shape of the program is
+platform-independent.
+
+However, External Libraries also shares some of the usability issues of
+Configured Imports. Like Configured Imports, it doesn't allow a cross-platform
+package to implement a platform-specific interface or to take and return
+platform-specific objects. In fact, since it doesn't support any way of
+including platform-specific APIs in an otherwise cross-platform library, it's
+even worse: where Configured Imports allows a library to have some of its API be
+platform-specific by choosing which library to export, External Libraries
+requires that the API either be untyped or segregated to a different library
+entirely.
+
+Both Configured Imports and External Libraries also produce a lot of verbosity
+when writing cross-platform code. Every time a user wants to write "do this on
+one platform and that on another", they have to create two new libraries that
+import it in different ways. Import When, on the other hand, allows the user to
+write small code for small ideas&mdash;look at `warn()` above, for example.
 
 ## Implications and limitations
 
-A good language is a cohesive whole. Even a small, well-defined proposal still has to hang together with the rest of the Dart platform.
+Most of Import When's interactions with other language features comes from the
+construction of interface views. Any API surface must be representable as an
+implementation-free interface. For the most part, this doesn't add any more of a
+constraint than existing language features that interact with methods, like
+`noSuchMethod` or even just the `Function` class.
 
-- How does this feature interact with the other language features&mdash;in both good and bad ways&mdash;?
-- If we adopt this feature what will it prevent us from doing now? What do we sacrifice for this?
-- How does it affect the future evolution of the language?
+Import When also requires that all implementations have access to the interfaces
+of all core libraries, even those they don't otherwise support. However, this is
+unlikely to cause problems in practice; implementations generally have access to
+the Dart SDK, which contains all core libraries anyway, and even if they didn't,
+interface-only representations are very light.
+
+To test this, I compiled `dart:html` to [a textual representation of its
+interface view][stubbed] using a modified version of [this script][stub]. Before
+formatting, this representation was a little over 400K, about a third the size
+of the original 1.2M. Most libraries' interface views should be even smaller
+relative to their size, since `dart:html` is uniquely full of annotations.
+`dart:io`, for example, goes from 780K to 50K.
+
+[stubbed]: https://gist.github.com/nex3/d2d4309b59291e3336de
+[stub]: https://github.com/dart-lang/bleeding_edge/tree/master/dart/pkg/stub_core_library
 
 ## Deliverables
 
-These don't have to be done *initially* but before the proposal can be given the final stamp of approval before it's shipped off to TC 52, three key artifacts are required.
-
-These will live in the same repo as your proposal.
-
-### Language specification changes
-
-These the actual, precise diffs for how the [language spec][] will be modified.
-Time to brush up on your [TeX][]. Being able to do this well is a rare gift, so
-you are not expected to be a spec wizard. Fortunately, we have a couple on
-staff. Do your best and as your proposal matures, we will help.
-
-### A working implementation
-
-Nothing flushes out the problems with a feature quite like writing it in cold, hard executable code. Before a proposal can be approved, some kind of working implementation must be provided.
-
-Again, you don't have to have this on day one. However, you should make as much progress on this as early as you can. You *are* expected to be able to write working code, so there's nothing really holding you back. Doing this before you show your proposal to the world is a good sanity check to ensure you don't propose something that turns out to be impossible to implement. (It happens to the best of us.)
-
-It's not necessary to actually implement your feature in the native Dart VM or dart2js compiler (though you can and will certainly get street cred for doing so). Instead, you may:
-
-* Write some sort of standalone prototype implementation.
-* Write a [transpiler][] that takes Dart code using your feature and translates it to "vanilla" Dart code.
-
-What matters is that you demonstrate that the feature can feasibly be implemented in a reasonable amount of code with good performance.
-
-### Tests
-
-Write tests that could be run under an implementation to determine if it implements your proposal correctly. Make sure to test both success and failure cases. Be thorough. Programming languages have combinatorial input, so defining a comprehensive test suite is difficult.
-
-Imagine an adversary is going to write a malicious implementation of your proposal that passes its tests but otherwise does things so horrible it will cause the language team to run screaming from your proposal. Don't let the adversary win.
-
-## Patents rights
-
-TC52, the Ecma technical committee working on evolving the open [Dart standard][], operates under a royalty-free patent policy, [RFPP][] (PDF). This means if the proposal graduates to being sent to TC52, you will have to sign the Ecma TC52 [external contributer form][] and submit it to Ecma.
-
-[tex]: http://www.latex-project.org/
-[language spec]: https://www.dartlang.org/docs/spec/
-[dart standard]: http://www.ecma-international.org/publications/standards/Ecma-408.htm
-[rfpp]: http://www.ecma-international.org/memento/TC52%20policy/Ecma%20Experimental%20TC52%20Royalty-Free%20Patent%20Policy.pdf
-[external contributer form]: http://www.ecma-international.org/memento/TC52%20policy/Contribution%20form%20to%20TC52%20Royalty%20Free%20Task%20Group%20as%20a%20non-member.pdf
+**TBD**
