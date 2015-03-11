@@ -70,7 +70,7 @@ cross-platform code, but it is nice to have:
 
 ## Examples
 
-To begin, let's look at an example from [the external library proposal][external
+To begin, let's look at an example from [the External Library proposal][external
 libs]. We want to write a library that exposes a `warn()` function that warns
 using the DOM on the browser and `stderr` on the standalone VM.
 
@@ -118,7 +118,7 @@ function does on each platform.
 
 ### A cross-platform HTTP client
 
-Let's steal from the external library proposal again, since an HTTP client is
+Let's steal from the External Library proposal again, since an HTTP client is
 such a good example&mdash;it's simple and widely-used, and there's a
 cross-platform package that implements it right now that we can base our
 implementation on.
