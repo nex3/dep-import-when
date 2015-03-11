@@ -361,7 +361,7 @@ of the original 1.2M. Most libraries' interface views should be even smaller
 relative to their size, since `dart:html` is uniquely full of annotations.
 `dart:io`, for example, goes from 780K to 50K.
 
-[stubbed]: https://gist.github.com/nex3/d2d4309b59291e3336de
+[stubbed]: /nex3/dep-import-when/blob/master/interface_view_example/dart_html.dart
 [stub]: https://github.com/dart-lang/bleeding_edge/tree/master/dart/pkg/stub_core_library
 
 ## Deliverables
