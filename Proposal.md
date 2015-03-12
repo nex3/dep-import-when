@@ -214,6 +214,12 @@ A `with` clause may be used with any other import clause, including `as`,
 `show`, and `hide`. It may also be used with `export`, in which case the
 interface view (if one is used) is exported rather than imported.
 
+Name resolution happens as normal, since the same names are in scope regardless
+of platform. That means that it's an error to, for example, have a class inherit
+from different superclasses on different platforms, even if they have the same
+name. This is an important restriction, because it keeps the static shape of the
+program the same across platforms.
+
 ### "Interface View"
 
 An *interface view* of a library is a new library with an identical static API
