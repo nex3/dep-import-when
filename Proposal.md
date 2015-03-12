@@ -273,7 +273,9 @@ Without an explicit marker of whether a library intends to work across
 platforms, it's difficult for a reader or someone who modifies the code in the
 future to know what code is acceptable to write where. If `dart:io` is imported,
 can they freely use global `dart:io` fields, or should they check
-`bool.fromEnvironment` first?
+`bool.fromEnvironment` first? Worse, it makes it easy for a package to rely on
+some platform-specific functionality deep in its bowels and have its users find
+out unpleasantly only at runtime.
 
 Søren's proposal also relies on tree shaking alone to avoid including code for
 an unused platform in compiled output; it has no means of saying, for example,
