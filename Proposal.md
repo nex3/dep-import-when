@@ -212,7 +212,9 @@ happen as normal regardless of `when`.
 
 A `with` clause may be used with any other import clause, including `as`,
 `show`, and `hide`. It may also be used with `export`, in which case the
-interface view (if one is used) is exported rather than imported.
+interface view (if one is used) is exported rather than imported. If it's used
+with a deferred import, the interface view of that import's library is imported
+at some future point instead of that library.
 
 Name resolution happens as normal, since the same names are in scope regardless
 of platform. That means that it's an error to, for example, have a class inherit
