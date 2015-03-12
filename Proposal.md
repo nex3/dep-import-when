@@ -4,7 +4,7 @@
 feedback and has not yet been submitted as an official DEP.**
 
 * Author: [Natalie Weizenbaum](/nex3) (nweiz@google.com)
-* Repository: [google/dep-import-with](/google/dep-import-with)
+* Repository: [nex3/dep-import-when](/nex3/dep-import-when)
 * Stakeholders: [Lasse](/lrhn) (lrn@google.com)
 
 ## Summary
@@ -260,14 +260,14 @@ different semantics. In chronological order:
 
 This proposal by [Søren Gjesse](https://github.com/sgjesse) predates the DEP
 process and doesn't have an official name or a repository. It's also the
-simplest of the four proposals, and the one that's closest to "import with".
+simplest of the four proposals, and the one that's closest to "import when".
 Rather than adding an explicit keyword that can be used to get the interface
 view of any library, though, it just says that platform-restricted libraries are
 *always* imported as interface views.
 
-This is simpler, but not by a lot; `with dart.io` isn't a large burden to type,
+This is simpler, but not by a lot; `when dart.io` isn't a large burden to type,
 especially since it will usually come up only once or twice per package. On the
-other hand, it has some serious downsides relative to "import with".
+other hand, it has some serious downsides relative to "import when".
 
 Without an explicit marker of whether a library intends to work across
 platforms, it's difficult for a reader or someone who modifies the code in the
