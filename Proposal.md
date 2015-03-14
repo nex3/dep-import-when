@@ -230,7 +230,7 @@ but no implementation. In particular:
 * All top-level or static function definitions of any kind, any instance
   methods, and any non-`const` constructors synchronously throw
   `UnsupportedError`s when called. Any default arguments for these functions are
-  replaced with `null`.
+  retained, since their values are always constant.
 
 * All non-`const` fields are converted to getters (and setters unless they're
   final) that throw `UnsupportedError`s when called.
