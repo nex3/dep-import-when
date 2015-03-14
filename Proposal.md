@@ -243,10 +243,9 @@ If it's useful, another possible modification would be:
 
 * A library imported only as an interface view is not visible to `dart:mirrors`.
 
-All of this includes the library itself as well as any libraries it exports. If
-it exports a library that's imported normally elsewhere in the program, those
-two libraries are not considered identical, even if they otherwise would be
-according to the canonicalization rules.
+All of this includes the library itself as well as any libraries it exports.
+
+Interface views are canonicalized separately from normal libraries.
 
 ### Analysis
 
@@ -350,6 +349,24 @@ when writing cross-platform code. Every time a user wants to write "do this on
 one platform and that on another", they have to create two new libraries that
 import it in different ways. Import When, on the other hand, allows the user to
 write small code for small ideas&mdash;look at `warn()` above, for example.
+
+### Import Show
+
+The [Import Show][] proposal is another variant of Configured Imports that
+addresses analysis issues. Rather than having a canonical library whose
+implementation comes from one of several places, it just adds one or more
+canonical function signatures to the `import` statement.
+
+This proposal is simpler than External Libraries, but shares many of the issues
+with it and with Configured Imports (other than difficult analysis, of course).
+In addition, by restricting the set of entities that can be imported to
+top-level functions, it makes the design of platform-specific implementations
+more difficult. In particular, most Dart libraries in general and most examples
+for platform-specific implementations in particular use classes rather than
+functions as their unit of code. Taking a class-based interface and translating
+it entirely into top-level functions is a serious tax.
+
+[Import Show]: https://github.com/eernstg/dep-configured-imports/blob/master/DEP-configured-imports.md
 
 ## Implications and limitations
 
